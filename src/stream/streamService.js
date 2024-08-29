@@ -88,7 +88,7 @@ const stopStream = (d) => {
 const saveImageAndStopStream = async () => {
   try {
     const cameras = await getCameraData();
-    console.log(cameras)
+
     cameras.forEach(d => {
       if (streams[d.camera_seq]) {
         // 스트림 중인 경우 이미지를 저장
