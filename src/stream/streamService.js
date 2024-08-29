@@ -7,7 +7,7 @@ const dayjs = require('dayjs');
 
 const streamBuffers = {};
 const streams = {}; 
-const streamStatus = {};
+
 
 const livePath = path.join('/','home','img','test','live');
 const logPath =  path.join('/','home','img','test','log');
@@ -32,7 +32,7 @@ const logImageSave = (buffer, i, typeIdx)=>{
     if (!fs.existsSync(savePath)) {
       fs.mkdirSync(savePath);
     }
-    fs.writeFileSync(path.join(savePath,  `${dayjs().format('HHmm')}.png`), jpegImageData.data);
+    fs.writeFileSync(path.join(savePath,  `${dayjs().format('YYYYMMDD_HH')}.png`), jpegImageData.data);
     return true;
   } catch (e) {
     console.log(e)
@@ -46,10 +46,11 @@ const initializeStream = (d) => {
     streamBuffers[stream.idx] = buffer;
   };
   stream.on('start', () => {
-    console.log(`Stream ${d.camera_seq} started`);
+    console.log(` ${stream.idx} Streaming started`);
+    
   });
   stream.on('stop', () => {
-    console.log(`Stream ${d.camera_seq} stopped`);
+    console.log(` ${stream.idx} Streaming stopped`);
   });
   stream.on('data', handleData);
   return stream;
@@ -57,9 +58,8 @@ const initializeStream = (d) => {
 
 const startStream = (d) => {
   if (!streams[d.camera_seq]) {
-    console.log(`${d.camera_seq} stream 시작`);
+    console.log(`${d.camera_seq} stream 요청`);
     streams[d.camera_seq] = initializeStream(d);
-    streamStatus[d.camera_seq] = true;
   }
 };
 
@@ -81,6 +81,7 @@ const updateLiveImage = async () => {
     cameras.forEach(d => {
       if (streams[d.camera_seq]) {
         const lastData = streamBuffers[d.camera_seq];
+        console.log(`${d.camera_seq} live Image 갱신`);
         if (lastData) {
           liveImgaeSave(lastData, d.camera_seq);
         }
@@ -100,6 +101,7 @@ const saveLogImage = async () => {
   try {
     const cameras = await getCameraData();
     cameras.forEach(d => {
+      console.log(`${d.camera_seq} log Image 갱신`);
       if (streams[d.camera_seq]) {
         const lastData = streamBuffers[d.camera_seq];
         if (lastData) {
@@ -122,7 +124,7 @@ const initializeNamespaces = (io, cameras) => {
   cameras.forEach((d) => {
     const ns = io.of(`/${d.camera_seq}`);
     ns.on('connection', (wsocket) => {
-      console.log(`WebSocket connection for camera ${d.camera_seq}`);
+      console.log(`클라이언트에서 웹소켓 요청 스트리밍 요청 by ${d.camera_seq}`);
       startStream(d);
       const pipeStream = (data) => {
         wsocket.emit('data', data);

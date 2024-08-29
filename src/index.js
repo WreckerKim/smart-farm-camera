@@ -9,7 +9,6 @@ const cors = require('cors');
 const app = express();
 const path = require('path');
 const fs = require('fs');
-const dayjs = require('dayjs');
 
 const server = http.createServer(app);
 const io = socketIo(server, {
@@ -29,7 +28,9 @@ schedule.scheduleJob('*/1 * * * *', async () => {
   const date = new Date();
   const hour = date.getHours();
   const mins = date.getMinutes();
-  if(mins%5==0){
+  const saveImgaeHour = hour === 10 ||  hour === 18;
+
+  if(mins == 30 && saveImgaeHour ){
     saveLogImage();
   }else{
     updateLiveImage();
