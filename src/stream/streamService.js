@@ -25,11 +25,16 @@ const liveImgaeSave = (buffer, i)=>{
   }
 }
 
-const logImageSave = (buffer, i)=>{
+const logImageSave = (buffer, i, typeIdx)=>{
   const rawImageData = jpeg.decode(buffer, true);
   const jpegImageData = jpeg.encode(rawImageData, 50);
+  const savePath = path.join(logPath,`${i}`,`${typeIdx}`);
+  
   try {
-    fs.writeFileSync(path.join(logPath,  `${i}_${dayjs().format('YYYYMMDD_HHmmss')}.png`), jpegImageData.data);
+    if (!fs.existsSync(savePath)) {
+      fs.mkdirSync(savePath);
+    }
+    fs.writeFileSync(path.join(savePath,  `${dayjs().format('YYYYMMDD_HHmmss')}.png`), jpegImageData.data);
     return true;
   } catch (e) {
     console.log(e)
@@ -83,22 +88,22 @@ const stopStream = (d) => {
 const saveImageAndStopStream = async () => {
   try {
     const cameras = await getCameraData();
-    
+    console.log(cameras)
     cameras.forEach(d => {
       if (streams[d.camera_seq]) {
         // 스트림 중인 경우 이미지를 저장
-        console.log(`${d.camera_seq} 스트림 활성 상태에서 이미지 저장`);
+        console.log(`${d.camera_seq} 스트림 -> 저장 `);
         const lastData = streamBuffers[d.camera_seq];
         if (lastData) {
           logImageSave(lastData, d.camera_seq);
         }
       } else {
         // 스트림 아닌 경우 스트림을 시작하여 이미지를 저장 후 스트림을 종료
-        console.log(`${d.camera_seq} 스트림 비활성 상태에서 시작 후 이미지 저장 및 스트림 종료`);
+        console.log(`${d.camera_seq} 스트림 비활성 -> 스트림 -> 저장 -> 종료`);
         startStream(d);
         
         streams[d.camera_seq].on('data', (buffer) => {
-          logImageSave(buffer, d.camera_seq);
+          logImageSave(buffer, d.camera_seq,d.tbl_devtype_no);
           stopStream(d); 
         });
       }
