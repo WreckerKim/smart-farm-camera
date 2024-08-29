@@ -1,8 +1,42 @@
 const { FFMpeg } = require('../config/rtsp-ffmpeg');
 const { getCameraData } = require('../config/data');
+const path = require('path');
+const fs = require('fs');
+const jpeg = require('jpeg-js');
 const streamBuffers = {};
 const streams = {}; 
-const status = {};
+const streamStatus = {}; // 스트림 기록 여부
+const dayjs = require('dayjs');
+
+
+const livePath = path.join('/','home','img','test','live');
+const logPath =  path.join('/','home','img','test','log');
+
+const liveImgaeSave = (buffer, i)=>{
+  const rawImageData = jpeg.decode(buffer, true);
+  const jpegImageData = jpeg.encode(rawImageData, 50);
+  try {
+     fs.writeFileSync(path.join(livePath, `${i}.png`), jpegImageData.data);
+    return true;
+  } catch (e) {
+    console.log(e)
+    return false
+  }
+}
+
+const logImageSave = (buffer, i)=>{
+  const rawImageData = jpeg.decode(buffer, true);
+  const jpegImageData = jpeg.encode(rawImageData, 50);
+  try {
+    // fs.writeFileSync(path.join(defaultPath, 'log', `${i}_${dayjs().format('YYYYMMDD_HHmmss')}.png`), jpegImageData.data);
+    fs.writeFileSync(path.join(logPath,  `${i}_${dayjs().format('YYYYMMDD_HHmmss')}.png`), jpegImageData.data);
+
+    return true;
+  } catch (e) {
+    console.log(e)
+    return false
+  }
+}
 
 const initializeStream = (d) => {
   const stream = new FFMpeg({ input: d.camera_url, idx: d.camera_seq, resolution: '640x360', quality: 3 });
@@ -28,14 +62,50 @@ const startStream = (d) => {
   if (!streams[d.camera_seq]) {
     console.log(`${d.camera_seq} stream 시작`);
     streams[d.camera_seq] = initializeStream(d);
+
+    streamStatus[d.camera_seq] = true;
   }
 };
 
 const stopStream = (d) => {
   if (streams[d.camera_seq]) {
     console.log(`${d.camera_seq} stream 중단`);
+    
+    const lastData = streamBuffers[d.camera_seq];
+    if (lastData) {
+      liveImgaeSave(lastData, d.camera_seq);
+    }
+
     streams[d.camera_seq].stop();
     delete streams[d.camera_seq];
+  }
+};
+
+const saveImageAndStopStream = async () => {
+  try {
+    const cameras = await getCameraData(); // 모든 카메라 데이터를 가져옴
+    
+    cameras.forEach(d => {
+      if (streams[d.camera_seq]) {
+        // 스트림이 활성 상태인 경우 이미지를 저장하고 스트림은 종료하지 않음
+        console.log(`${d.camera_seq} 스트림 활성 상태에서 이미지 저장`);
+        const lastData = streamBuffers[d.camera_seq];
+        if (lastData) {
+          logImageSave(lastData, d.camera_seq);
+        }
+      } else {
+        // 스트림이 비활성 상태인 경우 스트림을 시작하여 이미지를 저장하고 스트림을 종료
+        console.log(`${d.camera_seq} 스트림 비활성 상태에서 시작 후 이미지 저장 및 스트림 종료`);
+        startStream(d);
+        
+        streams[d.camera_seq].on('data', (buffer) => {
+          logImageSave(buffer, d.camera_seq);
+          stopStream(d); // 이미지 저장 후 스트림 종료
+        });
+      }
+    });
+  } catch (error) {
+    console.error('Error in saveImageAndStopStream:', error);
   }
 };
 
@@ -57,7 +127,7 @@ const initializeNamespaces = (io, cameras) => {
         streams[d.camera_seq].removeListener('data', pipeStream);
 
         if (ns.sockets.size === 0) {
-          stopStream(d); // 모든 클라이언트가 연결 해제되면 스트림 중지
+          stopStream(d); 
         }
       });
     });
@@ -73,6 +143,8 @@ const startStreaming = async (io) => {
   }
 };
 
+
 module.exports = {
   startStreaming,
+  saveImageAndStopStream 
 };
