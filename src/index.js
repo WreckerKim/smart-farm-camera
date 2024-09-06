@@ -28,7 +28,7 @@ schedule.scheduleJob('*/1 * * * *', async () => {
   const date = new Date();
   const hour = date.getHours();
   const mins = date.getMinutes();
-  const saveImgaeHour = hour === 10 ||  hour === 18;
+  const saveImgaeHour = hour === 11 ||  hour === 18;
 
   if(mins == 30 && saveImgaeHour ){
     saveLogImage();
@@ -36,6 +36,11 @@ schedule.scheduleJob('*/1 * * * *', async () => {
     updateLiveImage();
   }
 })
+
+app.get('/node', (req, res) => {
+  res.send('Hello World!');
+});
+
 
 app.get('/get-camera', async (req, res, next) => {
   const cameras = await getCameraData();
